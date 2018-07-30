@@ -5,19 +5,29 @@
 ### 1.1. Giới thiệu
 
 - Lưu ý: Trong tài liệu này chỉ thực hiện cài đặt OpenStack, bước cài đặt CEPH ở tài liệu khác.
+
 - Packstack là một công cụ cài đặt OpenStack nhanh chóng.
+
 - Packstack được phát triển bởi redhat
+
 - Chỉ hỗ trợ các distro: RHEL, Centos
+
 - Tự động hóa các bước cài đặt và lựa chọn thành phần cài đặt.
+
 - Nhanh chóng dựng được môi trường OpenStack để sử dụng làm PoC nội bộ, demo khách hàng, test tính năng.
+
 - Nhược điểm 1 : Đóng kín các bước cài đối với người mới.
+
 - Nhược điểm 2: Khó bug các lỗi khi cài vì đã được đóng gói cùng với các tool cài đặt tự động (puppet)
 
 ### 1.2. Môi trường thực hiện 
 
 - Distro: CentOS 7.x
+
 - OpenStack Queens
+
 - NIC1 - ens33: Là dải mạng mà các máy ảo sẽ giao tiếp với bên ngoài. Dải mạng này sử dụng chế độ bridge hoặc NAT của VMware Workstation
+
 - NIC2 - ens34: là dải mạng sử dụng cho các traffic MGNT + API + DATA VM. Dải mạng này sử dụng chế độ hostonly trong VMware Workstation
 
 ### 1.3. Mô hình
@@ -33,7 +43,10 @@ Thiết lập hostname
 
 `hostnamectl set-hostname controller1`
 
-Thiết lập IP
+
+* Thiết lập IP
+
+
 ``` sh
 echo "Setup IP  ens34"
 nmcli c modify ens34 ipv4.addresses 10.10.10.145/24
@@ -150,7 +163,11 @@ sudo yum install -y byobu
 Thiết lập hostname
 
 `hostnamectl set-hostname compute2`
-Thiết lập IP
+
+
+*Thiết lập IP
+
+
 ``` sh
 echo "Setup IP  ens33"
 nmcli c modify ens33 ipv4.addresses 192.168.239.147/24
@@ -176,6 +193,7 @@ sed -i 's/SELINUX=enforcing/SELINUX=disabled/g' /etc/sysconfig/selinux
 
 Khai báo repos cho OpenStack Queens trên node Compute2
 
+
 ``` sh
 sudo yum install -y centos-release-openstack-queens 
 yum update -y
@@ -187,14 +205,17 @@ yum install -y epel-release
 sudo yum install -y byobu 
 ```
 
-3. Cài đặt OpenStack Queens
-3.1. Chuẩn bị file trả lời cho packstack
-Đứng trên controller để thực hiện các bước sau
+### 3. Cài đặt OpenStack Queens
 
-Gõ lệnh dưới
+### 3.1. Chuẩn bị file trả lời cho packstack
 
-byobu
+Đứng trên controller để thực hiện các bước sau:
+
+Gõ lệnh dưới: `byobu`
+
 Tạo file trả lời để cài packstack
+
+
 ``` sh
 packstack packstack --gen-answer-file=/root/rdotraloi.txt \
     --allinone \
@@ -222,56 +243,65 @@ packstack packstack --gen-answer-file=/root/rdotraloi.txt \
 Thực thi file trả lời vừa tạo ở trên (nếu cần có thể mở ra để chỉnh lại các tham số cần thiết.
 
 `packstack --answer-file rdotraloi.txt`
+
+
 Nhập mật khẩu đăng nhập ssh của tài khoản root khi được yêu cầu.
 
 Chờ để packstack cài đặt xong.
 
 
+Đứng trên `Controller1` thực hiện lệnh dưới để sửa các cấu hình cần thiết.
 
+``` sh
+sed -i -e 's/enable_isolated_metadata=False/enable_isolated_metadata=True/g' /etc/neutron/dhcp_agent.ini
 
-ssh -o StrictHostKeyChecking=no root@192.168.12.202 "sed -i -e 's/compute1/192.168.12.202/g' /etc/nova/nova.conf"
+ssh -o StrictHostKeyChecking=no root@192.168.239.146 "sed -i -e 's/compute1/192.168.239.146/g' /etc/nova/nova.conf"
 
+ssh -o StrictHostKeyChecking=no root@192.168.239.147 "sed -i -e 's/compute2/192.168.239.147/g' /etc/nova/nova.conf"
+```
 
-ssh -o StrictHostKeyChecking=no root@192.168.12.203 "sed -i -e 's/compute2/192.168.12.203/g' /etc/nova/nova.conf"
+Tắt Iptables trên cả 03 node
 
+``` sh
+systemctl stop iptables
+systemctl disable iptables
 
+ssh -o StrictHostKeyChecking=no root@192.168.239.146 "systemctl stop iptables"
+ssh -o StrictHostKeyChecking=no root@192.168.239.146 "systemctl disable iptables"
 
+ssh -o StrictHostKeyChecking=no root@192.168.239.147 "systemctl stop iptables"
+ssh -o StrictHostKeyChecking=no root@192.168.239.147 "systemctl disable iptables"
+```
 
-ssh -o StrictHostKeyChecking=no root@192.168.12.202 "systemctl stop iptables"
-ssh -o StrictHostKeyChecking=no root@192.168.12.202 "systemctl disable iptables"
+Khởi động lại cả 03 node `Controller1`, `Compute1`, `Compute2`.
 
-ssh -o StrictHostKeyChecking=no root@192.168.12.203 "systemctl stop iptables"
-ssh -o StrictHostKeyChecking=no root@192.168.12.203 "systemctl disable iptables"
+``` sh
+ssh -o StrictHostKeyChecking=no root@192.168.239.146 "init 6"
 
-
-ssh -o StrictHostKeyChecking=no root@192.168.12.202 "init 6"
-
-ssh -o StrictHostKeyChecking=no root@192.168.12.203 "init 6"
+ssh -o StrictHostKeyChecking=no root@192.168.239.147 "init 6"
 
 init 6
+```
+
+Đăng nhập lại vào `Controller1` bằng quyền` root` và kiểm tra hoạt động của openstack sau khi cài.
+
+Khai báo biến môi trường:
+
+`source keystonerc_admin`
+
+
+Kiểm tra hoạt động của openstack bằng lệnh dưới (lưu ý: có thể phải mất vài phút để các service của OpenStack khởi động xong).
+
+`openstack token issue`
+
+
+
+Kết quả lệnh trên như sau:
 
 
 
 
-
-
-
-
-openstack subnet create --network provider \
-  --allocation-pool start=192.168.12.210,end=192.168.12.250 \
-  --dns-nameserver 8.8.8.8 --gateway 192.168.239.1 \
-  --subnet-range 192.168.12.0/24 provider
-
-
-
-openstack subnet create --network selfservice \
-  --dns-nameserver 8.8.8.8 --gateway 10.10.10.1 \
-  --subnet-range 10.10.10.0/24 selfservice
-
-
-
-
-
+``` sh
 [root@controller1 ~(keystone_admin)]# openstack user list
 +----------------------------------+------------+
 | ID                               | Name       |
@@ -290,214 +320,31 @@ openstack subnet create --network selfservice \
 | dec7389046f2480398c9dee979781163 | heat       |
 | f7f1bdd3a6954219a822900bb37cf8ac | neutron    |
 +----------------------------------+------------+
-[root@controller1 ~(keystone_admin)]# neutron net-list
-neutron CLI is deprecated and will be removed in the future. Use openstack CLI instead.
+```
 
-[root@controller1 ~(keystone_admin)]# openstack subnet create --network provider \
->   --allocation-pool start=192.168.239.210,end=192.168.239.250 \
->   --dns-nameserver 8.8.8.8 --gateway 192.168.239.1 \
->   --subnet-range 192.168.239.0/24 provider
-No Network found for provider
-[root@controller1 ~(keystone_admin)]# openstack network create  --share --external --provider-physical-network provider --provider-network-type flat provider
-+---------------------------+--------------------------------------+
-| Field                     | Value                                |
-+---------------------------+--------------------------------------+
-| admin_state_up            | UP                                   |
-| availability_zone_hints   |                                      |
-| availability_zones        |                                      |
-| created_at                | 2018-07-29T11:02:53Z                 |
-| description               |                                      |
-| dns_domain                | None                                 |
-| id                        | b2c2c68f-e9b3-4a26-8537-411a46d3f21a |
-| ipv4_address_scope        | None                                 |
-| ipv6_address_scope        | None                                 |
-| is_default                | False                                |
-| is_vlan_transparent       | None                                 |
-| mtu                       | 1500                                 |
-| name                      | provider                             |
-| port_security_enabled     | True                                 |
-| project_id                | 4a9cff0aed4a447b87bbdbcd2d3663f0     |
-| provider:network_type     | flat                                 |
-| provider:physical_network | provider                             |
-| provider:segmentation_id  | None                                 |
-| qos_policy_id             | None                                 |
-| revision_number           | 5                                    |
-| router:external           | External                             |
-| segments                  | None                                 |
-| shared                    | True                                 |
-| status                    | ACTIVE                               |
-| subnets                   |                                      |
-| tags                      |                                      |
-| updated_at                | 2018-07-29T11:02:54Z                 |
-+---------------------------+--------------------------------------+
-[root@controller1 ~(keystone_admin)]# openstack subnet create --network selfservice \
->   --dns-nameserver 8.8.8.8 --gateway 10.10.10.1 \
->   --subnet-range 10.10.10.0/24 selfservice
-No Network found for selfservice
-[root@controller1 ~(keystone_admin)]# openstack network create selfservice
-+---------------------------+--------------------------------------+
-| Field                     | Value                                |
-+---------------------------+--------------------------------------+
-| admin_state_up            | UP                                   |
-| availability_zone_hints   |                                      |
-| availability_zones        |                                      |
-| created_at                | 2018-07-29T11:04:37Z                 |
-| description               |                                      |
-| dns_domain                | None                                 |
-| id                        | 2b8eb80f-37de-43dc-8cdc-cb535c9a3352 |
-| ipv4_address_scope        | None                                 |
-| ipv6_address_scope        | None                                 |
-| is_default                | False                                |
-| is_vlan_transparent       | None                                 |
-| mtu                       | 1450                                 |
-| name                      | selfservice                          |
-| port_security_enabled     | True                                 |
-| project_id                | 4a9cff0aed4a447b87bbdbcd2d3663f0     |
-| provider:network_type     | vxlan                                |
-| provider:physical_network | None                                 |
-| provider:segmentation_id  | 65                                   |
-| qos_policy_id             | None                                 |
-| revision_number           | 2                                    |
-| router:external           | Internal                             |
-| segments                  | None                                 |
-| shared                    | False                                |
-| status                    | ACTIVE                               |
-| subnets                   |                                      |
-| tags                      |                                      |
-| updated_at                | 2018-07-29T11:04:37Z                 |
-+---------------------------+--------------------------------------+
-[root@controller1 ~(keystone_admin)]# openstack subnet create --network selfservice   --dns-nameserver 8.8.8.8 --gateway 10.10.10.1   --subnet-range 10.10.10.0/24 selfservice
-+-------------------+-----------------------------------------------+
-| Field             | Value                                         |
-+-------------------+-----------------------------------------------+
-| allocation_pools  | 10.10.10.1-10.10.10.1,10.10.10.3-10.10.10.254 |
-| cidr              | 10.10.10.0/24                                 |
-| created_at        | 2018-07-29T11:04:47Z                          |
-| description       |                                               |
-| dns_nameservers   | 8.8.8.8                                       |
-| enable_dhcp       | True                                          |
-| gateway_ip        | 10.10.10.1                                    |
-| host_routes       |                                               |
-| id                | a7155084-a815-4008-966f-56cd636df57c          |
-| ip_version        | 4                                             |
-| ipv6_address_mode | None                                          |
-| ipv6_ra_mode      | None                                          |
-| name              | selfservice                                   |
-| network_id        | 2b8eb80f-37de-43dc-8cdc-cb535c9a3352          |
-| project_id        | 4a9cff0aed4a447b87bbdbcd2d3663f0              |
-| revision_number   | 0                                             |
-| segment_id        | None                                          |
-| service_types     |                                               |
-| subnetpool_id     | None                                          |
-| tags              |                                               |
-| updated_at        | 2018-07-29T11:04:47Z                          |
-+-------------------+-----------------------------------------------+
-[root@controller1 ~(keystone_admin)]# openstack router create router
-+-------------------------+--------------------------------------+
-| Field                   | Value                                |
-+-------------------------+--------------------------------------+
-| admin_state_up          | UP                                   |
-| availability_zone_hints |                                      |
-| availability_zones      |                                      |
-| created_at              | 2018-07-29T11:05:31Z                 |
-| description             |                                      |
-| distributed             | False                                |
-| external_gateway_info   | None                                 |
-| flavor_id               | None                                 |
-| ha                      | False                                |
-| id                      | 43b45c4e-264a-4b3d-9b71-009703300c7b |
-| name                    | router                               |
-| project_id              | 4a9cff0aed4a447b87bbdbcd2d3663f0     |
-| revision_number         | 1                                    |
-| routes                  |                                      |
-| status                  | ACTIVE                               |
-| tags                    |                                      |
-| updated_at              | 2018-07-29T11:05:32Z                 |
-+-------------------------+--------------------------------------+
-[root@controller1 ~(keystone_admin)]# neutron router-interface-add router selfservice
-neutron CLI is deprecated and will be removed in the future. Use openstack CLI instead.
-Added interface cf1db525-f954-4468-8a02-4c7bb2b3f97b to router router.
-[root@controller1 ~(keystone_admin)]# neutron router-gateway-set router provider
-neutron CLI is deprecated and will be removed in the future. Use openstack CLI instead.
-Set gateway for router router
-[root@controller1 ~(keystone_admin)]# ip netns
-qrouter-43b45c4e-264a-4b3d-9b71-009703300c7b (id: 1)
-qdhcp-2b8eb80f-37de-43dc-8cdc-cb535c9a3352 (id: 0)
-[root@controller1 ~(keystone_admin)]# neutron router-port-list router
-neutron CLI is deprecated and will be removed in the future. Use openstack CLI instead.
-+--------------------------------------+------+----------------------------------+-------------------+-----------------------------------------------------------------------------------+
-| id                                   | name | tenant_id                        | mac_address       | fixed_ips                                                                         |
-+--------------------------------------+------+----------------------------------+-------------------+-----------------------------------------------------------------------------------+
-| bb254013-5ddc-49a4-818c-0ed3c981354b |      |                                  | fa:16:3e:2a:f3:48 |                                                                                   |
-| cf1db525-f954-4468-8a02-4c7bb2b3f97b |      | 4a9cff0aed4a447b87bbdbcd2d3663f0 | fa:16:3e:67:c8:a7 | {"subnet_id": "a7155084-a815-4008-966f-56cd636df57c", "ip_address": "10.10.10.2"} |
-+--------------------------------------+------+----------------------------------+-------------------+-----------------------------------------------------------------------------------+
-[root@controller1 ~(keystone_admin)]# openstack security group rule create --proto icmp default
-More than one SecurityGroup exists with the name 'default'.
-[root@controller1 ~(keystone_admin)]# openstack security group list
-+--------------------------------------+---------+------------------------+----------------------------------+
-| ID                                   | Name    | Description            | Project                          |
-+--------------------------------------+---------+------------------------+----------------------------------+
-| 07362a7d-96b7-4a5e-b10b-b22c0f766002 | default | Default security group |                                  |
-| 6e12c898-b2b8-4aa7-9aa8-49cba279380f | default | Default security group | 4a9cff0aed4a447b87bbdbcd2d3663f0 |
-+--------------------------------------+---------+------------------------+----------------------------------+
-[root@controller1 ~(keystone_admin)]# openstack security group rule create --proto icmp 6e12c898-b2b8-4aa7-9aa8-49cba279380f
-+-------------------+--------------------------------------+
-| Field             | Value                                |
-+-------------------+--------------------------------------+
-| created_at        | 2018-07-29T11:07:52Z                 |
-| description       |                                      |
-| direction         | ingress                              |
-| ether_type        | IPv4                                 |
-| id                | 2de89574-b98a-45e4-8867-5138b8ff899c |
-| name              | None                                 |
-| port_range_max    | None                                 |
-| port_range_min    | None                                 |
-| project_id        | 4a9cff0aed4a447b87bbdbcd2d3663f0     |
-| protocol          | icmp                                 |
-| remote_group_id   | None                                 |
-| remote_ip_prefix  | 0.0.0.0/0                            |
-| revision_number   | 0                                    |
-| security_group_id | 6e12c898-b2b8-4aa7-9aa8-49cba279380f |
-| updated_at        | 2018-07-29T11:07:52Z                 |
-+-------------------+--------------------------------------+
-[root@controller1 ~(keystone_admin)]# openstack security group rule create --proto tcp --dst-port 22 6e12c898-b2b8-4aa7-9aa8-49cba279380f
-+-------------------+--------------------------------------+
-| Field             | Value                                |
-+-------------------+--------------------------------------+
-| created_at        | 2018-07-29T11:08:08Z                 |
-| description       |                                      |
-| direction         | ingress                              |
-| ether_type        | IPv4                                 |
-| id                | 6a01e082-295b-44ab-af6a-b840d888795c |
-| name              | None                                 |
-| port_range_max    | 22                                   |
-| port_range_min    | 22                                   |
-| project_id        | 4a9cff0aed4a447b87bbdbcd2d3663f0     |
-| protocol          | tcp                                  |
-| remote_group_id   | None                                 |
-| remote_ip_prefix  | 0.0.0.0/0                            |
-| revision_number   | 0                                    |
-| security_group_id | 6e12c898-b2b8-4aa7-9aa8-49cba279380f |
-| updated_at        | 2018-07-29T11:08:08Z                 |
-+-------------------+--------------------------------------+
-[root@controller1 ~(keystone_admin)]#
+### 4. Tạo images, network, subnet, router, mở security group và tạo VM.
 
 
+### 4.1. Tạo images
 
+Đăng nhập vào node `controller1` với quyền root và thực thi các lệnh sau:
 
-openstack subnet create --network provider \
-  --allocation-pool start=192.168.239.204,end=192.168.239.250 \
-  --dns-nameserver 8.8.8.8 --gateway 192.168.239.2 \
-  --subnet-range 192.168.239.0/24 provider
+Tải images cirros. Images này dùng để tạo các máy ảo sau này:
 
+`wget http://download.cirros-cloud.net/0.3.5/cirros-0.3.5-x86_64-disk.img`
 
+Tạo images:
 
+``` sh
+source keystonerc_admin
 
+openstack image create "cirros" \
+  --file cirros-0.3.5-x86_64-disk.img \
+  --disk-format qcow2 --container-format bare \
+  --public
+```
 
-
-
-
-
+Kiểm tra việc tạo images, kết quả  :
 
 
 
