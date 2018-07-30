@@ -24,7 +24,7 @@
 
  - Ở phần này sẽ gộp dải manager +API +DATA vào dải provider network và dải self service network riêng
 
-<img src="1.png">
+<img src="/img/1.png">
 
 ### 2. Các bước chuẩn bị trên trên Controller
 
@@ -107,27 +107,22 @@ ERROR : Failed to load plugin from file ssl_001.py
 
 Thiết lập hostname
 
-systemctl start NetworkManager
+`systemctl start NetworkManager`
 
-hostnamectl set-hostname compute1
+`hostnamectl set-hostname compute1`
 Thiết lập IP
-
+``` sh
 echo "Setup IP  ens33"
-nmcli c modify ens33 ipv4.addresses 10.10.10.202/24
-nmcli c modify ens33 ipv4.method manual
-nmcli con mod ens33 connection.autoconnect yes
-
-echo "Setup IP  ens33"
-nmcli c modify ens33 ipv4.addresses 192.168.12.202/24
-nmcli c modify ens33 ipv4.gateway 192.168.239.1
+nmcli c modify ens33 ipv4.addresses 192.168.239.146/24
+nmcli c modify ens33 ipv4.gateway 192.168.239.2
 nmcli c modify ens33 ipv4.dns 8.8.8.8
 nmcli c modify ens33 ipv4.method manual
-nmcli con mod ens33 connection.autoconnect yes
+nmcli c modify ens33 connection.autoconnect yes
 
-echo "Setup IP  ens35"
-nmcli c modify ens35 ipv4.addresses 192.168.239.202/24
-nmcli c modify ens35 ipv4.method manual
-nmcli con mod ens35 connection.autoconnect yes
+echo "Setup IP  ens34"
+nmcli c modify ens34 ipv4.addresses 10.10.10.146/24
+nmcli c modify ens34 ipv4.method manual
+nmcli c modify ens34 connection.autoconnect yes
 
 sudo systemctl disable firewalld
 sudo systemctl stop firewalld
@@ -137,10 +132,10 @@ sudo systemctl enable network
 sudo systemctl start network
 
 sed -i 's/SELINUX=enforcing/SELINUX=disabled/g' /etc/sysconfig/selinux
-sed -i 's/SELINUX=enforcing/SELINUX=disabled/g' /etc/selinux/config
+```
 Khai báo repos cho OpenStack Queens trên node Compute1
 
-yum install -y python-setuptools
+``` sh
 sudo yum install -y centos-release-openstack-queens
 yum update -y
 
@@ -149,31 +144,25 @@ yum install -y openstack-packstack
 
 yum install -y epel-release
 sudo yum install -y byobu 
-Trong queens khi sử dụng packstack để cài có thể gặp lỗi ERROR : Failed to load plugin from file ssl_001.py, fix theo hướng dẫn dưới (trong đoạn trên đã cài sẵn các fix rồi nhé)
+```
 
-https://gist.github.com/congto/36116ef868ee8fe2b2e83249710fee16
 2.3. Các bước chuẩn bị trên trên Compute2
 Thiết lập hostname
 
-hostnamectl set-hostname compute2
+`hostnamectl set-hostname compute2`
 Thiết lập IP
-
+``` sh
 echo "Setup IP  ens33"
-nmcli c modify ens33 ipv4.addresses 10.10.10.203/24
-nmcli c modify ens33 ipv4.method manual
-nmcli con mod ens33 connection.autoconnect yes
-
-echo "Setup IP  ens33"
-nmcli c modify ens33 ipv4.addresses 192.168.12.203/24
-nmcli c modify ens33 ipv4.gateway 192.168.239.1
+nmcli c modify ens33 ipv4.addresses 192.168.239.147/24
+nmcli c modify ens33 ipv4.gateway 192.168.239.2
 nmcli c modify ens33 ipv4.dns 8.8.8.8
 nmcli c modify ens33 ipv4.method manual
-nmcli con mod ens33 connection.autoconnect yes
+nmcli c modify ens33 connection.autoconnect yes
 
-echo "Setup IP  ens35"
-nmcli c modify ens35 ipv4.addresses 192.168.239.203/24
-nmcli c modify ens35 ipv4.method manual
-nmcli con mod ens35 connection.autoconnect yes
+echo "Setup IP  ens34"
+nmcli c modify ens34 ipv4.addresses 10.10.10.147/24
+nmcli c modify ens34 ipv4.method manual
+nmcli c modify ens34 connection.autoconnect yes
 
 sudo systemctl disable firewalld
 sudo systemctl stop firewalld
@@ -183,10 +172,11 @@ sudo systemctl enable network
 sudo systemctl start network
 
 sed -i 's/SELINUX=enforcing/SELINUX=disabled/g' /etc/sysconfig/selinux
-sed -i 's/SELINUX=enforcing/SELINUX=disabled/g' /etc/selinux/config
+```
+
 Khai báo repos cho OpenStack Queens trên node Compute2
 
-yum install -y python-setuptools
+``` sh
 sudo yum install -y centos-release-openstack-queens 
 yum update -y
 
@@ -195,9 +185,8 @@ yum install -y openstack-packstack
 
 yum install -y epel-release
 sudo yum install -y byobu 
-Trong queens khi sử dụng packstack để cài có thể gặp lỗi ERROR : Failed to load plugin from file ssl_001.py, fix theo hướng dẫn dưới (trong đoạn trên đã cài sẵn các fix rồi nhé)
+```
 
-https://gist.github.com/congto/36116ef868ee8fe2b2e83249710fee16
 3. Cài đặt OpenStack Queens
 3.1. Chuẩn bị file trả lời cho packstack
 Đứng trên controller để thực hiện các bước sau
@@ -206,7 +195,7 @@ Gõ lệnh dưới
 
 byobu
 Tạo file trả lời để cài packstack
-
+``` sh
 packstack packstack --gen-answer-file=/root/rdotraloi.txt \
     --allinone \
     --default-password=Welcome123 \
@@ -223,13 +212,16 @@ packstack packstack --gen-answer-file=/root/rdotraloi.txt \
     --os-neutron-ovs-bridge-interfaces=br-ex:ens35 \
     --os-neutron-ovs-bridges-compute=br-ex \
     --os-neutron-ml2-type-drivers=vxlan,flat \
-    --os-controller-host=192.168.239.145 \
+    --os-controller-host=192.168.12.201 \
     --os-compute-hosts=192.168.12.202,192.168.12.203 \
     --os-neutron-ovs-tunnel-if=ens33 \
     --provision-demo=n
+```
+	
+	
 Thực thi file trả lời vừa tạo ở trên (nếu cần có thể mở ra để chỉnh lại các tham số cần thiết.
 
-packstack --answer-file rdotraloi.txt
+`packstack --answer-file rdotraloi.txt`
 Nhập mật khẩu đăng nhập ssh của tài khoản root khi được yêu cầu.
 
 Chờ để packstack cài đặt xong.
