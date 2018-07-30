@@ -36,6 +36,7 @@
 
 <img src="/img/1.png">
 
+
 ### 2. Các bước chuẩn bị trên trên Controller
 
 
@@ -116,7 +117,7 @@ ERROR : Failed to load plugin from file ssl_001.py
 ```
 
 
-2.2. Các bước chuẩn bị trên trên Compute1
+### 2.2. Các bước chuẩn bị trên trên Compute1
 
 Thiết lập hostname
 
@@ -149,7 +150,7 @@ sed -i 's/SELINUX=enforcing/SELINUX=disabled/g' /etc/sysconfig/selinux
 Khai báo repos cho OpenStack Queens trên node Compute1
 
 ``` sh
-sudo yum install -y centos-release-openstack-queens
+yum install centos-release-openstack-queens.x86_64 -y
 yum update -y
 
 sudo yum install -y wget crudini fping
@@ -159,7 +160,7 @@ yum install -y epel-release
 sudo yum install -y byobu 
 ```
 
-2.3. Các bước chuẩn bị trên trên Compute2
+### 2.3. Các bước chuẩn bị trên trên Compute2
 Thiết lập hostname
 
 `hostnamectl set-hostname compute2`
@@ -195,7 +196,7 @@ Khai báo repos cho OpenStack Queens trên node Compute2
 
 
 ``` sh
-sudo yum install -y centos-release-openstack-queens 
+yum install centos-release-openstack-queens.x86_64 -y
 yum update -y
 
 sudo yum install -y wget crudini fping
@@ -244,10 +245,23 @@ Thực thi file trả lời vừa tạo ở trên (nếu cần có thể mở ra
 
 `packstack --answer-file rdotraloi.txt`
 
+Sau khi cài đặt xong, màn hình sẽ hiển thị thông báo như dưới:
+
+``` sh
+**** Installation completed successfully ******
+
+Additional information:
+ * Time synchronization installation was skipped. Please note that unsynchronized time on server instances might be problem for some OpenStack components.
+ * File /root/keystonerc_admin has been created on OpenStack client host 192.168.239.145. To use the command line tools you need to source the file.
+ * To access the OpenStack Dashboard browse to http://192.168.239.145/dashboard .
+Please, find your login credentials stored in the keystonerc_admin in your home directory.
+ * The installation log file is available at: /var/tmp/packstack/20180730-100156-y15EAs/openstack-setup.log
+ * The generated manifests are available at: /var/tmp/packstack/20180730-100156-y15EAs/manifests
+[root@controller1 ~]#
+```
+
 
 Nhập mật khẩu đăng nhập ssh của tài khoản root khi được yêu cầu.
-
-Chờ để packstack cài đặt xong.
 
 
 Đứng trên `Controller1` thực hiện lệnh dưới để sửa các cấu hình cần thiết.
@@ -294,7 +308,17 @@ Kiểm tra hoạt động của openstack bằng lệnh dưới (lưu ý: có th
 
 `openstack token issue`
 
-
+``` sh
+[root@controller1 ~(keystone_admin)]# openstack token issue
++------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| Field      | Value                                                                                                                                                                                   |
++------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| expires    | 2018-07-30T05:09:13+0000                                                                                                                                                                |
+| id         | gAAAAABbXo9phyc_1REQCintFOSoJCIC57rH5d3tYK_p7gHfOKwDMBuOmpwPWDgNdpa775KNWat4CD6KpZ7EvQo3h8i_PlBSER1q8Kfvax3ff3O02aA1BkY3EM55jD1azdDyYIIspr0N89h6tPq6l7Bqw_3Gsvce0U-_0ar6PZ2Z8uu3JTdZNrU |
+| project_id | 196c9ee913de4a81a568b30a455e78eb                                                                                                                                                        |
+| user_id    | 47ecbfe6a82143fe930b917b82f830e3                                                                                                                                                        |
++------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+```
 
 Kết quả lệnh trên như sau:
 
@@ -336,15 +360,47 @@ Tải images cirros. Images này dùng để tạo các máy ảo sau này:
 Tạo images:
 
 ``` sh
-source keystonerc_admin
-
-openstack image create "cirros" \
-  --file cirros-0.3.5-x86_64-disk.img \
-  --disk-format qcow2 --container-format bare \
-  --public
+[root@controller1 ~(keystone_admin)]# openstack image create "cirros" \
+>   --file cirros-0.3.5-x86_64-disk.img \
+>   --disk-format qcow2 --container-format bare \
+>   --public
++------------------+------------------------------------------------------+
+| Field            | Value                                                |
++------------------+------------------------------------------------------+
+| checksum         | f8ab98ff5e73ebab884d80c9dc9c7290                     |
+| container_format | bare                                                 |
+| created_at       | 2018-07-30T04:16:18Z                                 |
+| disk_format      | qcow2                                                |
+| file             | /v2/images/c41b30db-3cb9-467f-8d48-fc07323537bb/file |
+| id               | c41b30db-3cb9-467f-8d48-fc07323537bb                 |
+| min_disk         | 0                                                    |
+| min_ram          | 0                                                    |
+| name             | cirros                                               |
+| owner            | 196c9ee913de4a81a568b30a455e78eb                     |
+| protected        | False                                                |
+| schema           | /v2/schemas/image                                    |
+| size             | 13267968                                             |
+| status           | active                                               |
+| tags             |                                                      |
+| updated_at       | 2018-07-30T04:16:18Z                                 |
+| virtual_size     | None                                                 |
+| visibility       | public                                               |
++------------------+------------------------------------------------------+
+[root@controller1 ~(keystone_admin)]# 
 ```
 
 Kiểm tra việc tạo images, kết quả  :
+
+``` sh
+[root@controller1 ~(keystone_admin)]# openstack image list
++--------------------------------------+--------+--------+
+| ID                                   | Name   | Status |
++--------------------------------------+--------+--------+
+| c41b30db-3cb9-467f-8d48-fc07323537bb | cirros | active |
++--------------------------------------+--------+--------+
+[root@controller1 ~(keystone_admin)]#
+```
+
 
 
 
